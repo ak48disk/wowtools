@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
 
 namespace ExpressionCalc
 {
@@ -12,6 +10,11 @@ namespace ExpressionCalc
         {
             this.l = l;
             accept();
+        }
+
+        private Exception UnexpectedToken()
+        {
+            return new Exception(String.Format("Unexpected token {0}", Lexer.GetTokenTypeName(lookAhead.TokenType)));
         }
 
         private Expression factor()
@@ -34,7 +37,7 @@ namespace ExpressionCalc
                     id = match(Lexer.TOKEN_NUMBER);
                     return new ConstantExpression(-id.numToken);
                 default:
-                    throw new Exception();
+                    throw UnexpectedToken();
             }
             return retVal;
         }
@@ -113,11 +116,26 @@ namespace ExpressionCalc
         {
             while (!l.eof())
             {
-                Lexer.Token token = match(Lexer.TOKEN_ID);
-                match('=');
-                Expression e = expr();
-                match(';');
-                ctx.AddExpression(token.strToken, e);
+                if (lookAhead.TokenType == Lexer.TOKEN_DEFINE)
+                {
+                    accept();
+                    Lexer.Token token = match(Lexer.TOKEN_ID);
+                    match('=');
+                    Expression e = expr();
+                    match(';');
+                    ctx.AddExpression(token.strToken, e);
+                }
+                else if (lookAhead.TokenType == Lexer.TOKEN_LET)
+                {
+                    accept();
+                    Lexer.Token token = match(Lexer.TOKEN_ID);
+                    match('=');
+                    Lexer.Token number = match(Lexer.TOKEN_NUMBER);
+                    match(';');
+                    ctx.AddConstant(token.strToken, number.numToken);
+                }
+                else
+                    throw UnexpectedToken();
             }
         }
 
@@ -132,7 +150,8 @@ namespace ExpressionCalc
             if (lookAhead.TokenType == Token_type)
                 accept();
             else
-                throw new Exception();
+                throw new Exception(String.Format("Expect {0}, got {1}",
+                    Lexer.GetTokenTypeName(Token_type), Lexer.GetTokenTypeName(lookAhead.TokenType)));
             return retVal;
         }
 
@@ -149,8 +168,8 @@ namespace ExpressionCalc
 
         private static int[,] priorities = 
         {
-	        {'*', -1},
-	        {'+', -1},
+	        {'*', -1 , -1},
+	        {'+', '-', -1},
         };
 
         private Lexer.Token lookAhead;

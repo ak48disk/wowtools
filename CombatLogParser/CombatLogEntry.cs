@@ -35,6 +35,35 @@ namespace CombatLogParser
         }
     }
 
+    public static class UnitFlyweight
+    {
+        private static Unit TryGetUnit(UInt64 unitGUID)
+        {
+            Unit retVal;
+            if (_unitDict.TryGetValue(unitGUID, out retVal))
+                return retVal;
+            else
+                return null;
+        }
+        private static void AddUnit(Unit unit)
+        {
+            _unitDict.Add(unit.Guid,unit);
+        }
+        public static Unit GetUnit(string[] param,ref int index)
+        {
+            UInt64 Guid = ParseHelper.ParseGUID(param[index + 0]);
+            Unit retVal = TryGetUnit(Guid);
+            if (retVal == null)
+            {
+                retVal = new Unit(param, index);
+                AddUnit(retVal);
+            }
+            index += 4;
+            return retVal;
+        }
+        private static Dictionary<UInt64, Unit> _unitDict = new Dictionary<ulong, Unit>();
+    }
+
     public enum CombatEventType
     {
 
@@ -50,6 +79,14 @@ namespace CombatLogParser
             SpellName = ParseHelper.ParseValue<string>(param[1+index]);
             SpellSchool = ParseHelper.ParseHexValue(param[2+index]);
         }
+        public override bool Equals(object obj)
+        {
+            return (obj is SpellInfo) && ((SpellInfo)obj).SpellId == SpellId; 
+        }
+        public override int GetHashCode()
+        {
+            return SpellId.GetHashCode();
+        }
     }
     public class DamageInfo
     {
@@ -64,6 +101,8 @@ namespace CombatLogParser
         public bool Crushing { get; private set; }
         public DamageInfo(string[] param,int index)
         {
+            if (param[index + 0].Contains("."))
+                index += 2;
             Amount = ParseHelper.ParseValue<uint>(param[index + 0]);
             Overkill = ParseHelper.ParseValue<int>(param[index + 1]);
             School = ParseHelper.ParseValue<uint>(param[index + 2]);
@@ -169,8 +208,10 @@ namespace CombatLogParser
         public bool Critical { get; private set; }
         public HealInfo(string[] param, int index)
         {
-            Amount = ParseHelper.ParseValue<uint>(param[index + 0]);
-            OverHealing = ParseHelper.ParseValue<uint>(param[index + 1]);
+            if (param[index + 0].Contains("."))
+                index += 2;
+            Amount = (uint)ParseHelper.ParseValue<uint>(param[index + 0]);
+            OverHealing = (uint)ParseHelper.ParseValue<uint>(param[index + 1]);
             Absorbed = ParseHelper.ParseValue<int>(param[index + 2]);
             Critical = ParseHelper.ParseBool(param[index + 3]);
         }
@@ -249,15 +290,20 @@ namespace CombatLogParser
 
         private string[] ParseCommonValues(string[] rawEntryValues,ref int index)
         {
-            eventType = ParseHelper.ParseValue<string>(rawEntryValues[index]);
-            Source = new Unit(rawEntryValues,index + 1);
-            Dest = new Unit(rawEntryValues,index + 5);
+            eventType = ParseHelper.ParseValue<string>(rawEntryValues[index++]);
+            if (eventType.StartsWith("ENCOUNTER"))
+                return rawEntryValues;
+            //Source = new Unit(rawEntryValues,index + 1);
+            //Dest = new Unit(rawEntryValues,index + 5);
+
             /*affectingGUID = ParseGUID(rawEntryValues[9]);
             zoneID = ParseValue<uint>(rawEntryValues[10]);
             classID = ParseValue<uint>(rawEntryValues[11]);
             powerID = ParseValue<uint>(rawEntryValues[12]);
             powerAfterEvent = ParseValue<uint>(rawEntryValues[13]);*/
-            index += 9;
+      
+            Source = UnitFlyweight.GetUnit(rawEntryValues, ref index);
+            Dest = UnitFlyweight.GetUnit(rawEntryValues, ref index);
             return rawEntryValues;
         }
 

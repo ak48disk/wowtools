@@ -19,6 +19,34 @@ namespace CombatLogParser
             this.OverHealingAmount = overHealingAmount;
         }
     }
+
+    public class HealingMeter
+        : Pipe<Dictionary<Unit, List<HealingInfo>>, Combat>
+    {
+        public override Dictionary<Unit, List<HealingInfo>> Process(Combat input)
+        {
+            return input.Events.Where(r => r.Heal != null).GroupBy(r => r.Source).ToDictionary(
+                r => r.First().Source, r =>
+                    {
+                        return r.GroupBy(e => e.Spell).Select(e =>
+                            {
+                                UInt64 healAmount = 0;
+                                UInt64 overHeal = 0;
+                                UInt64 critHeal = 0;
+                                foreach (var entry in e)
+                                {
+                                    var singleHealAmount = entry.Heal.Amount + (uint)entry.Heal.Absorbed;
+                                    overHeal += entry.Heal.OverHealing;
+                                    if (entry.Heal.Critical)
+                                        critHeal += singleHealAmount;
+                                    healAmount += singleHealAmount;
+                                }
+                                return new HealingInfo(e.First().Spell, (uint)healAmount, (uint)overHeal);
+                            }).OrderBy(t => t.EffectiveAmount).ToList();
+                    });
+        }
+    }
+
     public class AbsorbDetector
         : Pipe<Dictionary<Unit,List<HealingInfo>>,Combat>
     {
@@ -42,7 +70,10 @@ namespace CombatLogParser
                     {
                         if (currentAmount.ContainsKey(entry.Spell.SpellId) &&
                             currentAmount[entry.Spell.SpellId] > 0)
-                            throw new Exception();
+                        {
+                            spells[entry.Spell.SpellId].OverHealingAmount += currentAmount[entry.Spell.SpellId];
+                            currentAmount[entry.Spell.SpellId] = 0;
+                        }
                         currentAmount[entry.Spell.SpellId] = entry.Other.Amount;
                         spells[entry.Spell.SpellId].TotalAmount += entry.Other.Amount;
                     }

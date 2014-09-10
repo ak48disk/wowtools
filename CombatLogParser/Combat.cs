@@ -27,6 +27,12 @@ namespace CombatLogParser
                 () => { if (events.Count == 0 ) return new TimeSpan(0);
                 return events.Last().Time - events.First().Time;
                 });
+            players = new Lazy<List<Unit>>(
+                () =>
+                {
+                    return events.Where(r => r.Source.Type == Unit.UnitType.Player).Select(r => r.Source).Distinct().ToList();
+                }
+                );
         }
 
         public Combat(List<RawCombatLogEntry> events, Combat parent)
@@ -69,5 +75,8 @@ namespace CombatLogParser
         private Lazy<TimeSpan> duration;
         public TimeSpan Duration { get { return duration.Value; } }
         public Combat Parent { get; private set; }
+        public IReadOnlyCollection<Unit> Players { get { return players.Value.AsReadOnly(); } }
+
+        private Lazy<List<Unit>> players;
     }
 }

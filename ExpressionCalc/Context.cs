@@ -1,12 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text;
 
 namespace ExpressionCalc
 {
-    [ComVisible(true)]
     public class Context
         : IArgumentProvider
     {
@@ -78,6 +76,27 @@ namespace ExpressionCalc
             return expr.Calculate(this);
         }
 
+        public Expression Simplify(Expression expr)
+        {
+            bool complete = false;
+            while (!complete)
+            {
+                complete = true;
+                foreach (var name in expr.GetDependentParamerters())
+                {
+                    if (ExistsConstantOrExpression(name))
+                    {
+                        if (ContainArgument(name))
+                            expr = expr.ReplaceParameter(name,new ConstantExpression(GetArgument(name)));
+                        else 
+                            expr = expr.ReplaceParameter(name,GetExpression(name));
+                        complete = false;
+                    }
+                }
+            }
+            return expr.Normalize();
+        }
+
         private Expression GetExpressionReplaced(Expression expr, string name)
         {
             bool changed = false;
@@ -131,11 +150,11 @@ namespace ExpressionCalc
             StringBuilder sb = new StringBuilder();
             foreach (var expression in definedExpressions)
             {
-                sb.AppendLine(string.Format("define {0} = {1}",expression.Key,expression.Value.ToString()));
+                sb.AppendLine(string.Format("define {0} = {1};",expression.Key,expression.Value.ToString()));
             }
             foreach(var constant in predefinedConstants)
             {
-                sb.AppendLine(string.Format("let {0} = {1}",constant.Key,constant.Value.ToString()));
+                sb.AppendLine(string.Format("let {0} = {1};",constant.Key,constant.Value.ToString()));
             }
             return sb.ToString();
         }

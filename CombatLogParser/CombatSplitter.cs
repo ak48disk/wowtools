@@ -17,12 +17,15 @@ namespace CombatLogParser
             bool flag = false;
             foreach (var entry in input)
             {
-                if (lastSpellDamageEventTime.HasValue &&
-                        entry.Time - lastSpellDamageEventTime.Value > threshold)
+                if ((lastSpellDamageEventTime.HasValue &&
+                        entry.Time - lastSpellDamageEventTime.Value > threshold) ||
+                    entry.eventType == "ENCOUNTER_END" ||
+                    entry.eventType == "ENCOUNTER_START")
                 {
                     if (!flag)
                     {
-                        yield return (new Combat(currentCombatEvents));
+                        if (currentCombatEvents.Count > 0)
+                            yield return (new Combat(currentCombatEvents));
                         currentCombatEvents = new List<RawCombatLogEntry>();
                         flag = true;
                     }

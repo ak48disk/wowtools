@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CombatLogParser.CommandHandler;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -13,7 +14,7 @@ namespace CombatLogParser
         {
             IEnumerable<RawCombatLogEntry> spellHeals;
             List<Combat> combats;
-            using (FileStream fs = new FileStream(@"G:\World of Warcraft\Logs\WoWCombatLog3.txt", FileMode.Open))
+            using (FileStream fs = new FileStream(@"G:\wowpvp1\Logs\WoWCombatLog.txt", FileMode.Open))
             {
                 var rw = new RawFileInlineReader().Then(new CombatSplitter());
                 combats = rw.Process(fs).Where(_=>_.Duration > new TimeSpan(0,1,0) && _.MainTarget != "Nothing")
@@ -26,7 +27,13 @@ namespace CombatLogParser
                     Console.WriteLine("{0}\t{1}\t{2}", i, combats[i].MainTarget, combats[i].Duration);
                 }
                 string str = Console.ReadLine();
-                
+
+                if (str == "command")
+                {
+                    CommandController.Instance.Handle(new CombatsHandler(combats));
+                    continue;
+                }
+
                 int index = int.Parse(str);
                 spellHeals = combats[index].Events.Where(_ => _.eventType.EndsWith ("_HEAL"));
                 List<string> sourceNames = spellHeals.Select(_ => _.Source.Name).Distinct().ToList();
@@ -38,7 +45,8 @@ namespace CombatLogParser
                 var damages = new DamageMeter().Process(combats[index]).OrderByDescending(_ => _.Value).ToList();
                 foreach (var dmgEntry in damages)
                 {
-                    Console.WriteLine("{0}\t{1}\t{2}", dmgEntry.Key.Name, dmgEntry.Value, (double)dmgEntry.Value / combats[index].Duration.TotalSeconds);
+                    Console.WriteLine("{0}\t{1}\t{2}", dmgEntry.Key.Name, dmgEntry.Value, 
+                        (double)dmgEntry.Value / combats[index].Duration.TotalSeconds);
                 }
 
                 while (true)
@@ -49,11 +57,42 @@ namespace CombatLogParser
                         if (s == "exit") break;
 
                         var combat = combats[index];
+                        if (s.StartsWith("v"))
+                        {
+                            var events = combat.Events.Where(r =>
+                                r.Dest.Name == "起点代言人" && r.eventType.StartsWith("SPELL") && r.Source.Reaction == Unit.UnitReaction.Hostile);
+                            foreach (var entry in events)
+                            {
+                                Console.Write(entry.Time.ToString());
+                                Console.Write(" ");
+                                Console.Write(entry.Time.Millisecond.ToString());
+                                Console.Write(" ");
+                                Console.Write(entry.eventType);
+                                if (entry.Damage != null)
+                                {
+                                    Console.Write(" ");
+                                    Console.Write(entry.Source.Name);
+                                    Console.Write(" ");
+                                    Console.Write(entry.Damage.Amount);
+                                }
+                                if (entry.Spell != null)
+                                {
+                                    Console.Write(" ");
+                                    Console.Write(entry.Spell.SpellName);
+                                    if (entry.eventType == "SPELL_AURA_REMOVED")
+                                        Console.Write("Fade");
+                                    Console.Write(" ");
+                                    if (entry.Other != null)
+                                    Console.Write(entry.Other.Amount);
+                                }
+                                Console.WriteLine();
+                            }
+                        }
                         if (s.StartsWith("buff"))
                         {
 
                             IEnumerable<RawCombatLogEntry> buff = combat.Events.Where(r => r.eventType == "SPELL_AURA_APPLIED" &&
-                                r.Source.Reaction != Unit.UnitReaction.Friendly &&
+                                r.Source.Reaction == Unit.UnitReaction.Hostile &&
                                 r.Dest.Reaction == Unit.UnitReaction.Friendly).OrderBy(r => r.Time);
 
                             var m = str.Split(' ');
@@ -74,29 +113,22 @@ namespace CombatLogParser
                         if (s.StartsWith("cast"))
                         {
 
-                            IEnumerable<RawCombatLogEntry> buff = combat.Events.Where(r => r.eventType == "SPELL_CAST_START" &&
-                                
-                                r.Source.Reaction != Unit.UnitReaction.Friendly).OrderBy(r => r.Time);
+                            IEnumerable<RawCombatLogEntry> buff = combat.Events.Where(r => r.eventType == "SPELL_CAST_SUCCESS" &&
+                                r.Source.Reaction == Unit.UnitReaction.Hostile).OrderBy(r => r.Time);
 
-                            var m = s.Split(' ');
+                            var m = str.Split(' ');
                             if (m.Count() > 1)
                                 buff = buff.Where(r => r.Spell.SpellId == int.Parse(m[1]));
 
-                            string p = "";
-                            RawCombatLogEntry lastEntry = null;
                             foreach (var entry in buff)
                             {
-
-                                p += string.Format("{0}\t{1}\t{2}\t{3}\t{4}\t{5}",
-                                    (entry.Time - combat.Events.First().Time).ToString("g"),
-                                    lastEntry == null ? 0.0 : (entry.Time - lastEntry.Time).TotalMilliseconds / 1000.0,
+                                Console.WriteLine("{0}\t{1}\t{2}\t{3}\t{4}",
+                                    entry.Time,
                                     entry.Spell.SpellId, entry.Spell.SpellName,
                                     entry.Source.Name, entry.Dest.Name);
-                                lastEntry = entry;
-                                p += Environment.NewLine;
 
                             }
-                            Console.Write(p);
+
                             continue;
                         }
 

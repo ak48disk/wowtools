@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO;
 
 // Lexical analyzer
 
@@ -102,6 +101,29 @@ namespace ExpressionCalc
         public const int TOKEN_EOF = -1;
         public const int TOKEN_NUMBER = 1;
         public const int TOKEN_ID = 2;
+        public const int TOKEN_DEFINE = 3;
+        public const int TOKEN_LET = 4;
+
+
+        public static string GetTokenTypeName(int tokenType)
+        {
+            switch (tokenType)
+            {
+                case TOKEN_EOF:
+                    return "<EOF>";
+                case TOKEN_NUMBER:
+                    return "Number";
+                case TOKEN_ID:
+                    return "Identifier";
+                case TOKEN_DEFINE:
+                    return "define";
+                case TOKEN_LET:
+                    return "let";
+                default:
+                    return "(unknown token type)" + (char)tokenType;
+            }
+        }
+
 
         /// <summary>
         /// Construct A new Lexical analyzer
@@ -227,8 +249,15 @@ namespace ExpressionCalc
                                 _current = _source.next();
                             } while (Char.IsLetterOrDigit(_current) || _current == '_');
                             //Not keywords, check identifier
-                            _currentToken.TokenType = TOKEN_ID;
-                            _currentToken.strToken = _currentStringToken;
+                            if (_currentStringToken == "define")
+                                _currentToken.TokenType = TOKEN_DEFINE;
+                            else if (_currentStringToken == "let")
+                                _currentToken.TokenType = TOKEN_LET;
+                            else
+                            {
+                                _currentToken.TokenType = TOKEN_ID;
+                                _currentToken.strToken = _currentStringToken;
+                            }
                             _currentStringToken = "";
                             return _currentToken;
                         }

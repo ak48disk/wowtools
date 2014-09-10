@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ExpressionCalc
 {
@@ -15,7 +13,7 @@ namespace ExpressionCalc
 
     public abstract class Expression
     {
-        public abstract string[] GetDependentParamerters();
+        public abstract IEnumerable<string> GetDependentParamerters();
         public abstract double Calculate(IArgumentProvider argumentProvider);
         public abstract bool Calculatable(IArgumentProvider argumentProvider);
         public abstract Expression GetDerivation(string parameter);
@@ -57,9 +55,9 @@ namespace ExpressionCalc
             return this;
         }
 
-        public override string[] GetDependentParamerters()
+        public override IEnumerable<string> GetDependentParamerters()
         {
-            return new string[0];
+            yield break;
         }
 
         public override string ToString()
@@ -101,9 +99,9 @@ namespace ExpressionCalc
             return argumentProvider.GetArgument(parameterName);
         }
 
-        public override string[] GetDependentParamerters()
+        public override IEnumerable<string> GetDependentParamerters()
         {
-            return new string[] { parameterName };
+            yield return parameterName;
         }
 
         public override Expression GetDerivation(string parameter)
@@ -164,14 +162,15 @@ namespace ExpressionCalc
             return sum;
         }
 
-        public override string[] GetDependentParamerters()
+        public override IEnumerable<string> GetDependentParamerters()
         {
-            List<string> s = new List<string>();
             foreach (var operand in operands)
             {
-                s.AddRange(operand.GetDependentParamerters());
+                foreach (var param in operand.GetDependentParamerters())
+                {
+                    yield return param;
+                }
             }
-            return s.ToArray();
         }
 
         public override Expression GetDerivation(string parameter)
@@ -362,14 +361,15 @@ namespace ExpressionCalc
             return result;
         }
 
-        public override string[] GetDependentParamerters()
+        public override IEnumerable<string> GetDependentParamerters()
         {
-            List<string> s = new List<string>();
             foreach (var operand in operands)
             {
-                s.AddRange(operand.GetDependentParamerters());
+                foreach (var param in operand.GetDependentParamerters())
+                {
+                    yield return param;
+                }
             }
-            return s.ToArray();
         }
 
         public override string ToString()
