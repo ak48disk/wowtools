@@ -57,8 +57,8 @@ namespace CombatLogParser
             {
                 Dictionary<uint, HealingInfo> spells = new Dictionary<uint, HealingInfo>();
                 Dictionary<Unit, Dictionary<uint, uint>> currentAmounts = new Dictionary<Unit, Dictionary<uint, uint>>();
-                var AuraEvents = r.Where(_ => _.eventType == "SPELL_AURA_APPLIED" ||
-                    _.eventType == "SPELL_AURA_REFRESH" || _.eventType == "SPELL_AURA_REMOVED");
+                var AuraEvents = r.Where(_ => _.EventType == "SPELL_AURA_APPLIED" ||
+                    _.EventType == "SPELL_AURA_REFRESH" || _.EventType == "SPELL_AURA_REMOVED");
                 foreach (var entry in AuraEvents)
                 {
                     if (!spells.ContainsKey(entry.Spell.SpellId))
@@ -66,7 +66,7 @@ namespace CombatLogParser
                     if (!currentAmounts.ContainsKey(entry.Dest))
                         currentAmounts[entry.Dest] = new Dictionary<uint, uint>();
                     var currentAmount = currentAmounts[entry.Dest];
-                    if (entry.eventType == "SPELL_AURA_APPLIED")
+                    if (entry.EventType == "SPELL_AURA_APPLIED")
                     {
                         if (currentAmount.ContainsKey(entry.Spell.SpellId) &&
                             currentAmount[entry.Spell.SpellId] > 0)
@@ -74,23 +74,23 @@ namespace CombatLogParser
                             spells[entry.Spell.SpellId].OverHealingAmount += currentAmount[entry.Spell.SpellId];
                             currentAmount[entry.Spell.SpellId] = 0;
                         }
-                        currentAmount[entry.Spell.SpellId] = entry.Other.Amount;
-                        spells[entry.Spell.SpellId].TotalAmount += entry.Other.Amount;
+                        currentAmount[entry.Spell.SpellId] = entry.Amount.Value;
+                        spells[entry.Spell.SpellId].TotalAmount += entry.Amount.Value;
                     }
-                    else if (entry.eventType == "SPELL_AURA_REMOVED")
+                    else if (entry.EventType == "SPELL_AURA_REMOVED")
                     {
                         if (!currentAmount.ContainsKey(entry.Spell.SpellId))
                             continue;
-                        spells[entry.Spell.SpellId].OverHealingAmount += entry.Other.Amount;
+                        spells[entry.Spell.SpellId].OverHealingAmount += entry.Amount.Value;
                         currentAmount[entry.Spell.SpellId] = 0;
                     }
-                    else if (entry.eventType == "SPELL_AURA_REFRESH")
+                    else if (entry.EventType == "SPELL_AURA_REFRESH")
                     {
                         if (!currentAmount.ContainsKey(entry.Spell.SpellId))
                             currentAmount[entry.Spell.SpellId] = 0;
-                        if (entry.Other.Amount > currentAmount[entry.Spell.SpellId])
-                            spells[entry.Spell.SpellId].TotalAmount += (entry.Other.Amount - currentAmount[entry.Spell.SpellId]);
-                        currentAmount[entry.Spell.SpellId] = entry.Other.Amount;
+                        if (entry.Amount.Value > currentAmount[entry.Spell.SpellId])
+                            spells[entry.Spell.SpellId].TotalAmount += (entry.Amount.Value - currentAmount[entry.Spell.SpellId]);
+                        currentAmount[entry.Spell.SpellId] = entry.Amount.Value;
                     }
                 }
                 foreach (var currentAmount in currentAmounts)

@@ -16,7 +16,7 @@ namespace CombatLogParser
                 {
                     if (Parent != null)
                         return Parent.MainTarget;
-                    var seq = events.Where(_ => _.eventType == "SPELL_DAMAGE").GroupBy(_ => _.Dest.Guid).OrderByDescending(
+                    var seq = events.Where(_ => _.EventType == "SPELL_DAMAGE").GroupBy(_ => _.Dest.Guid).OrderByDescending(
                 r => r.Sum(_ => _.Damage.Amount)).FirstOrDefault();
                     if (seq != null)
                         return seq.First().Dest.Name;

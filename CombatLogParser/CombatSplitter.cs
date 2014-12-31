@@ -19,8 +19,8 @@ namespace CombatLogParser
             {
                 if ((lastSpellDamageEventTime.HasValue &&
                         entry.Time - lastSpellDamageEventTime.Value > threshold) ||
-                    entry.eventType == "ENCOUNTER_END" ||
-                    entry.eventType == "ENCOUNTER_START")
+                    entry.EventType == "ENCOUNTER_END" ||
+                    entry.EventType == "ENCOUNTER_START")
                 {
                     if (!flag)
                     {
@@ -30,7 +30,7 @@ namespace CombatLogParser
                         flag = true;
                     }
                 }
-                if (entry.eventType == "SPELL_DAMAGE")
+                if (entry.EventType == "SPELL_DAMAGE")
                 {
                     if (flag)
                     {

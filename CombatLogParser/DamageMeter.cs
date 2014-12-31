@@ -18,7 +18,7 @@ namespace CombatLogParser
                     ulong result = 0;
                     foreach (var entry in r)
                     {
-                        if (entry.eventType.EndsWith("_DAMAGE"))
+                        if (entry.EventType.EndsWith("_DAMAGE"))
                             if (entry.Damage != null)
                                 result += entry.Damage.Amount;
                     }

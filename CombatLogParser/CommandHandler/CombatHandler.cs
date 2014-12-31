@@ -140,11 +140,11 @@ namespace CombatLogParser.CommandHandler
                 {
                     var datetime = DateTime.Parse(command.Replace("buff ",""));
                     HashSet<string> curr = new HashSet<string>();
-                    foreach (var events in body.Player(player).Events.Where(r => (r.eventType == "SPELL_AURA_APPLIED" || r.eventType == "SPELL_AURA_REMOVED") && r.Time <= datetime))
+                    foreach (var events in body.Player(player).Events.Where(r => (r.EventType == "SPELL_AURA_APPLIED" || r.EventType == "SPELL_AURA_REMOVED") && r.Time <= datetime))
                     {
-                        if (events.eventType == "SPELL_AURA_APPLIED" && !curr.Contains(events.Spell.SpellName))
+                        if (events.EventType == "SPELL_AURA_APPLIED" && !curr.Contains(events.Spell.SpellName))
                             curr.Add(events.Spell.SpellName);
-                        if (events.eventType == "SPELL_AURA_REMOVED" && curr.Contains(events.Spell.SpellName))
+                        if (events.EventType == "SPELL_AURA_REMOVED" && curr.Contains(events.Spell.SpellName))
                             curr.Remove(events.Spell.SpellName);
                     }
                     foreach (var buff1 in curr)
@@ -153,7 +153,7 @@ namespace CombatLogParser.CommandHandler
                     }
                     return this;
                 }
-                var buffs = body.Player(player).Events.Where(r => r.eventType == "SPELL_AURA_APPLIED").Select(r => String.Format("{0} {1}", r.Time, r.Spell.SpellName));
+                var buffs = body.Player(player).Events.Where(r => r.EventType == "SPELL_AURA_APPLIED").Select(r => String.Format("{0} {1}", r.Time, r.Spell.SpellName));
                 int i = 0;
                 foreach (var buff in buffs)
                 {
@@ -169,7 +169,7 @@ namespace CombatLogParser.CommandHandler
             }
             else if (command == "taken")
             {
-                var events = body.Player(player).Events.Where(r => r.eventType == "SPELL_DAMAGE" && r.Dest == player).Select(r => String.Format("{0} {1} {2} {3}", r.Time, r.Spell.SpellName, r.Damage.Amount, r.Damage.Absorbed));
+                var events = body.Player(player).Events.Where(r => r.EventType == "SPELL_DAMAGE" && r.Dest == player).Select(r => String.Format("{0} {1} {2} {3}", r.Time, r.Spell.SpellName, r.Damage.Amount, r.Damage.Absorbed));
                 foreach (var buff in events)
                     Console.WriteLine(buff);
                 return this;

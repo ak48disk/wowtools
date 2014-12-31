@@ -16,9 +16,9 @@ namespace CombatLogParser
             return (T)Convert.ChangeType(source, typeof(T));
         }
 
-        public static UInt64 ParseGUID(string source)
+        public static string ParseGUID(string source)
         {
-            return Convert.ToUInt64(source, 16);
+            return source;
         }
 
         public static uint ParseHexValue(string source)
@@ -33,11 +33,21 @@ namespace CombatLogParser
                 return true;
             return false;
         }
+
+        public static Nullable<AuraType> ParseAuraType(string s)
+        {
+            if (s == "BUFF")
+                return AuraType.BUFF;
+            else if (s == "DEBUFF")
+                return AuraType.DEBUFF;
+            else
+                return null;
+        }
     }
 
     public static class UnitFlyweight
     {
-        private static Unit TryGetUnit(UInt64 unitGUID)
+        public static Unit TryGetUnit(string unitGUID)
         {
             Unit retVal;
             if (_unitDict.TryGetValue(unitGUID, out retVal))
@@ -49,35 +59,32 @@ namespace CombatLogParser
         {
             _unitDict.Add(unit.Guid,unit);
         }
-        public static Unit GetUnit(string[] param,ref int index)
+        public static Unit ParseUnit(string[] param,ref int index)
         {
-            UInt64 Guid = ParseHelper.ParseGUID(param[index + 0]);
+            string Guid = ParseHelper.ParseGUID(param[index + 0]);
             Unit retVal = TryGetUnit(Guid);
             if (retVal == null)
             {
-                retVal = new Unit(param, index);
+                retVal = new Unit(param, ref index);
                 AddUnit(retVal);
             }
-            index += 4;
+            else
+                index += Unit.NumberOfFields;
             return retVal;
         }
-        private static Dictionary<UInt64, Unit> _unitDict = new Dictionary<ulong, Unit>();
+        private static Dictionary<string, Unit> _unitDict = new Dictionary<string, Unit>();
     }
 
-    public enum CombatEventType
-    {
-
-    }
     public class SpellInfo
     {
         public uint SpellId { get; private set; }
         public string SpellName { get; private set; }
         public uint SpellSchool { get; private set; }
-        public SpellInfo(string[] param,int index)
+        public SpellInfo(string[] param,ref int index)
         {
-            SpellId = ParseHelper.ParseValue<uint>(param[0+index]);
-            SpellName = ParseHelper.ParseValue<string>(param[1+index]);
-            SpellSchool = ParseHelper.ParseHexValue(param[2+index]);
+            SpellId = ParseHelper.ParseValue<uint>(param[index++]);
+            SpellName = ParseHelper.ParseValue<string>(param[index++]);
+            SpellSchool = ParseHelper.ParseHexValue(param[index++]);
         }
         public override bool Equals(object obj)
         {
@@ -99,24 +106,24 @@ namespace CombatLogParser
         public bool Critical { get; private set; }
         public bool Glancing { get; private set; }
         public bool Crushing { get; private set; }
-        public DamageInfo(string[] param,int index)
+        public bool MultiStrike { get; private set; }
+        public DamageInfo(string[] param,ref int index)
         {
-            if (param[index + 0].Contains("."))
-                index += 2;
-            Amount = ParseHelper.ParseValue<uint>(param[index + 0]);
-            Overkill = ParseHelper.ParseValue<int>(param[index + 1]);
-            School = ParseHelper.ParseValue<uint>(param[index + 2]);
-            Resisted = ParseHelper.ParseValue<int>(param[index + 3]);
-            Blocked = ParseHelper.ParseValue<int>(param[index + 4]);
-            Absorbed = ParseHelper.ParseValue<int>(param[index + 5]);
-            Critical = ParseHelper.ParseBool(param[index + 6]);
-            Glancing = ParseHelper.ParseBool(param[index + 7]);
-            Crushing = ParseHelper.ParseBool(param[index + 8]);
+            Amount = ParseHelper.ParseValue<uint>(param[index++]);
+            Overkill = ParseHelper.ParseValue<int>(param[index++]);
+            School = ParseHelper.ParseValue<uint>(param[index++]);
+            Resisted = ParseHelper.ParseValue<int>(param[index++]);
+            Blocked = ParseHelper.ParseValue<int>(param[index++]);
+            Absorbed = ParseHelper.ParseValue<int>(param[index++]);
+            Critical = ParseHelper.ParseBool(param[index++]);
+            Glancing = ParseHelper.ParseBool(param[index++]);
+            Crushing = ParseHelper.ParseBool(param[index++]);
+            MultiStrike = ParseHelper.ParseBool(param[index++]);
         }
     }
     public class Unit
     {
-        public UInt64 Guid { get; private set; }
+        public string Guid { get; private set; }
         public string Name { get; private set; }
         public uint Flags { get; private set; }
         public uint RaidFlags { get; private set; }
@@ -163,13 +170,15 @@ namespace CombatLogParser
                 return UnitReaction.Unknown;
             }
         }
-        public Unit(string[] param,int index)
+        public Unit(string[] param,ref int index)
         {
             Guid = ParseHelper.ParseGUID(param[index + 0]);
             Name = ParseHelper.ParseValue<string>(param[index + 1]);
             Flags = ParseHelper.ParseHexValue(param[index + 2]);
             RaidFlags = ParseHelper.ParseHexValue(param[index + 3]);
+            index += NumberOfFields;
         }
+        public const int NumberOfFields = 4;
         public override bool Equals(object obj)
         {
             return (obj is Unit) && ((obj as Unit).Guid.Equals(Guid));
@@ -182,20 +191,42 @@ namespace CombatLogParser
 
     public class MiscInfo
     {
-        public UInt64 AffectingUnitGuid { get; private set; }
-        public uint HealthAfterEvent { get; private set; }
-        public uint ZoneID { get; private set; }
-        public uint ClassId { get; private set; }
-        public uint PowerId { get; private set; }
-        public uint PowerAfterEvent { get; private set; }
-        public MiscInfo(string[] param,int index)
+        public string AffectingUnitGUID { get; private set; }
+        public Unit AffectingUnit
         {
-            AffectingUnitGuid = ParseHelper.ParseGUID(param[index + 0]);
-            HealthAfterEvent = ParseHelper.ParseValue<uint>(param[index + 1]);
-            ZoneID = ParseHelper.ParseValue<uint>(param[index + 2]);
-            ClassId = ParseHelper.ParseValue<uint>(param[index + 3]);
-            PowerId = ParseHelper.ParseValue<uint>(param[index + 4]);
-            PowerAfterEvent = ParseHelper.ParseValue<uint>(param[index + 5]);
+            get
+            {
+                if (affectingUnit == null)
+                    affectingUnit = UnitFlyweight.TryGetUnit(AffectingUnitGUID);
+                return affectingUnit;
+            }
+        }
+        private Unit affectingUnit;
+        public uint HealthMax { get; private set; }
+        public uint HealthAfterEvent { get; private set; }
+        public uint AttackPower { get; private set; }
+        public uint SpellPower { get; private set; }
+        public uint Resolve { get; private set; }
+        public int PowerType { get; private set; }
+        public uint PowerAfterEvent { get; private set; }
+        public uint PowerMax { get; private set; }
+        public double MapX { get; private set; }
+        public double MapY { get; private set; }
+        public uint ItemLevel { get; private set; }
+        public MiscInfo(string[] param,ref int index)
+        {
+            AffectingUnitGUID = ParseHelper.ParseGUID(param[index++]);
+            HealthAfterEvent = ParseHelper.ParseValue<uint>(param[index++]);
+            HealthMax = ParseHelper.ParseValue<uint>(param[index++]);
+            AttackPower = ParseHelper.ParseValue<uint>(param[index++]);
+            SpellPower = ParseHelper.ParseValue<uint>(param[index++]);
+            Resolve = ParseHelper.ParseValue<uint>(param[index++]);
+            PowerType = ParseHelper.ParseValue<int>(param[index++]);
+            PowerAfterEvent = ParseHelper.ParseValue<uint>(param[index++]);
+            PowerMax = ParseHelper.ParseValue<uint>(param[index++]);
+            MapX = ParseHelper.ParseValue<double>(param[index++]);
+            MapY = ParseHelper.ParseValue<double>(param[index++]);
+            ItemLevel = ParseHelper.ParseValue<uint>(param[index++]);
         }
     }
 
@@ -206,76 +237,172 @@ namespace CombatLogParser
         public uint Effective { get { return Amount - OverHealing; } }
         public uint OverHealing { get; private set; }
         public bool Critical { get; private set; }
-        public HealInfo(string[] param, int index)
+        public bool MultiStrike { get; private set; }
+        public HealInfo(string[] param, ref int index)
         {
-            if (param[index + 0].Contains("."))
-                index += 2;
-            Amount = (uint)ParseHelper.ParseValue<uint>(param[index + 0]);
-            OverHealing = (uint)ParseHelper.ParseValue<uint>(param[index + 1]);
-            Absorbed = ParseHelper.ParseValue<int>(param[index + 2]);
-            Critical = ParseHelper.ParseBool(param[index + 3]);
+            Amount = ParseHelper.ParseValue<uint>(param[index++]);
+            OverHealing = (uint)ParseHelper.ParseValue<uint>(param[index++]);
+            Absorbed = ParseHelper.ParseValue<int>(param[index++]);
+            Critical = ParseHelper.ParseBool(param[index++]);
+            MultiStrike = ParseHelper.ParseBool(param[index++]);
         }
     }
 
-    public class OtherInfo
+    public class MissInfo
     {
+        public string Reason { get; private set; }
+        public bool OffHand { get; private set; }
+        public bool MultiStrike { get; private set; }
         public uint Amount { get; private set; }
-        public OtherInfo(string type, string[] param, ref int index)
+        public MissInfo(string[] param, ref int index)
         {
-            if (type.EndsWith("AURA_APPLIED") ||
-                type.EndsWith("AURA_REMOVED") ||
-                type.EndsWith("AURA_REFRESH")
-                )
-            {
-                index++;
-                if (param.Length > index)
-                    Amount = ParseHelper.ParseValue<uint>(param[index++]);
-            }
+            Reason = param[index++];
+            OffHand = ParseHelper.ParseBool(param[index++]);
+            MultiStrike = ParseHelper.ParseBool(param[index++]);
+            if (Reason == "ABSORB" || Reason == "BLOCK")
+                Amount = ParseHelper.ParseValue<uint>(param[index++]);
         }
     }
-    
+
+    public enum AuraType
+    {
+        BUFF,
+        DEBUFF,
+    }
+
     public class RawCombatLogEntry
     {
+        private void ParseEventType(string[] rawEntryValues, ref int index)
+        {
+            EventType = ParseHelper.ParseValue<string>(rawEntryValues[index++]);
+        }
+
+        private void ParseUnits(string[] rawEntryValues, ref int index)
+        {
+            Source = UnitFlyweight.ParseUnit(rawEntryValues, ref index);
+            Dest = UnitFlyweight.ParseUnit(rawEntryValues, ref index);
+        }
+
+        private void ParseSpell(string[] rawEntryValues, ref int index)
+        {
+            if (EventType == "SPELL_ABSORBED")
+            {
+                uint spellId;
+                if (!uint.TryParse(rawEntryValues[index], out spellId))
+                    return;
+            }
+            if (EventType.StartsWith("SPELL_") || EventType.StartsWith("RANGE_") || EventType == "DAMAGE_SPLIT")
+                Spell = new SpellInfo(rawEntryValues, ref index);
+        }
+
+        private void ParseMisc(string[] rawEntryValues, ref int index)
+        {
+            if (rawEntryValues.Length - index >= 12 && EventType != "SPELL_ABSORBED")
+            {
+                Misc = new MiscInfo(rawEntryValues, ref index);
+            }
+        }
+
+        private void ParseDamage(string[] rawEntryValues, ref int index)
+        {
+            if (EventType.EndsWith("_DAMAGE") || EventType.EndsWith("_DAMAGE_LANDED") ||
+                EventType.EndsWith("SHIELD") || EventType == "DAMAGE_SPLIT")
+                Damage = new DamageInfo(rawEntryValues, ref index);
+        }
+
+        private void ParseHeal(string[] rawEntryValues, ref int index)
+        {
+            if (EventType.EndsWith("_HEAL"))
+                Heal = new HealInfo(rawEntryValues, ref index);
+        }
+        
+        private void ParseMiss(string[] rawEntryValues, ref int index)
+        {
+            if (EventType.EndsWith("MISSED"))
+                Miss = new MissInfo(rawEntryValues, ref index);
+        }
+
+        private void ParseOthers(string[] rawEntryValues, ref int index)
+        {
+            switch(EventType)
+            {
+                case "SPELL_ABSORBED":
+                    AbsorbCaster = UnitFlyweight.ParseUnit(rawEntryValues, ref index);
+                    AlternativeSpell = new SpellInfo(rawEntryValues, ref index);
+                    Amount = ParseHelper.ParseValue<uint>(rawEntryValues[index++]);
+                    break;
+                case "SPELL_AURA_APPLIED":
+                case "SPELL_AURA_REMOVED":
+                case "SPELL_AURA_REFRESH":
+                case "SPELL_AURA_BROKEN":
+                    SpellAuraType = ParseHelper.ParseAuraType(rawEntryValues[index++]);
+                    if (rawEntryValues.Length > index)
+                        Amount = ParseHelper.ParseValue<uint>(rawEntryValues[index++]);
+                    break;
+                case "SPELL_AURA_APPLIED_DOSE":
+                case "SPELL_AURA_REMOVED_DOSE":
+                    SpellAuraType = ParseHelper.ParseAuraType(rawEntryValues[index++]);
+                    Amount = ParseHelper.ParseValue<uint>(rawEntryValues[index++]);
+                    break;
+                case "SPELL_CAST_FAILED":
+                    FailReason = rawEntryValues[index++];
+                    break;
+                case "SPELL_ENERGIZE":
+                    PowerType = ParseHelper.ParseValue<int>(rawEntryValues[index++]);
+                    Amount = ParseHelper.ParseValue<uint>(rawEntryValues[index++]);
+                    break;
+                case "SPELL_INTERRUPT":
+                    AlternativeSpell = new SpellInfo(rawEntryValues, ref index);
+                    break;
+                case "SPELL_AURA_BROKEN_SPELL":
+                    AlternativeSpell = new SpellInfo(rawEntryValues, ref index);
+                    SpellAuraType = ParseHelper.ParseAuraType(rawEntryValues[index++]);
+                    break;
+                case "UNIT_DIED":
+                case "UNIT_DESTORYED":
+                case "UNIT_DESTROYED":
+                case "SPELL_INSTAKILL":
+                case "PARTY_KILL":
+                    if (rawEntryValues[index] == "0")
+                        index++;
+                    break;
+            }
+            if (rawEntryValues.Length > index && false)
+            {
+                Console.Write(EventType);
+                Console.Write(" ");
+                Console.WriteLine(string.Join(",", rawEntryValues.Skip(index)));
+                Console.WriteLine(string.Join(",", rawEntryValues));
+            }
+        }
+
+
         public RawCombatLogEntry(DateTime time, string[] rawEntryValues)
         {
             this.Time = time;
             int index = 0;
-            this.rawEntryValues = ParseCommonValues(rawEntryValues, ref index);
-            if (eventType.StartsWith("SPELL_") || eventType.StartsWith("RANGE_") || eventType == "DAMAGE_SPLIT")
+            ParseEventType(rawEntryValues, ref index);
+            if (EventType.StartsWith("ENCOUNTER"))
             {
-                Spell = new SpellInfo(this.rawEntryValues,index);
-                index += 3;
-            }
-            try
-            {
-                if (this.rawEntryValues.Length - index > 6 && eventType != "DAMAGE_SPLIT")
-                {
-                    Misc = new MiscInfo(this.rawEntryValues, index);
-                    index += 6;
-                }
-            }
-            catch (Exception)
-            { }
-            if (eventType.StartsWith("ENVIRONMENTAL_"))
-            {
-                index++;
-            }
-            if (eventType.EndsWith("_DAMAGE") || eventType.EndsWith("SHIELD"))
-            {
-                Damage = new DamageInfo(this.rawEntryValues,index);
-                index += 9;
-            }
-            else if (eventType.EndsWith("_HEAL"))
-            {
-                Heal = new HealInfo(this.rawEntryValues, index);
-                index += 4;
+                //Parse Encounter
             }
             else
             {
-                Other = new OtherInfo(eventType, this.rawEntryValues, ref index);
-                //TODO ref index
+                ParseUnits(rawEntryValues, ref index);
+                ParseSpell(rawEntryValues, ref index);
+                ParseMisc(rawEntryValues, ref index);
+
+                if (EventType.StartsWith("ENVIRONMENTAL_"))
+                {
+                    index++;
+                }
+                ParseDamage(rawEntryValues, ref index);
+                ParseHeal(rawEntryValues, ref index);
+                ParseMiss(rawEntryValues, ref index);
+                ParseOthers(rawEntryValues, ref index);
             }
-            this.rawEntryValues = this.rawEntryValues.Skip(index).ToArray();
+
+            this.rawEntryValues = rawEntryValues.Skip(index).ToArray();
         }
 
         public string RawEntryValue(int index)
@@ -288,49 +415,22 @@ namespace CombatLogParser
             return (T)Convert.ChangeType(RawEntryValue(index), typeof(T));
         }
 
-        private string[] ParseCommonValues(string[] rawEntryValues,ref int index)
-        {
-            eventType = ParseHelper.ParseValue<string>(rawEntryValues[index++]);
-            if (eventType.StartsWith("ENCOUNTER"))
-                return rawEntryValues;
-            //Source = new Unit(rawEntryValues,index + 1);
-            //Dest = new Unit(rawEntryValues,index + 5);
-
-            /*affectingGUID = ParseGUID(rawEntryValues[9]);
-            zoneID = ParseValue<uint>(rawEntryValues[10]);
-            classID = ParseValue<uint>(rawEntryValues[11]);
-            powerID = ParseValue<uint>(rawEntryValues[12]);
-            powerAfterEvent = ParseValue<uint>(rawEntryValues[13]);*/
-      
-            Source = UnitFlyweight.GetUnit(rawEntryValues, ref index);
-            Dest = UnitFlyweight.GetUnit(rawEntryValues, ref index);
-            return rawEntryValues;
-        }
-
         public DateTime Time { get; private set; }
-        public string eventType { get; private set; }
+        public string EventType { get; private set; }
         public Unit Source { get; private set; }
         public Unit Dest { get; private set; }
-        /*public UInt64 sourceGUID { get; private set; }
-        public string sourceName { get; private set; }
-        public uint sourceFlags { get; private set; }
-        public uint sourceRaidFlags { get; private set; }
-        public UInt64 destGUID { get; private set; }
-        public string destName { get; private set; }
-        public uint destFlags { get; private set; }
-        public uint destRaidFlags { get; private set; }*/
-        public UInt64 affectingGUID { get; private set; }
-        public uint affectingHealth { get; private set; }
-        public uint zoneID { get; private set; }
-        public uint classID { get; private set; }
-        public uint powerID { get; private set; }
-        public uint powerAfterEvent { get; private set; }
         public SpellInfo Spell { get; private set; }
         public DamageInfo Damage { get; private set; }
         public MiscInfo Misc { get; private set; }
         public HealInfo Heal { get; private set; }
-        public OtherInfo Other { get; private set; }
+        public MissInfo Miss { get; private set; }
 
+        public Unit AbsorbCaster { get; private set; }
+        public Nullable<uint> Amount { get; private set; }
+        public Nullable<int> PowerType { get; private set; }
+        public Nullable<AuraType> SpellAuraType { get; private set; }
+        public string FailReason { get; private set; }
+        public SpellInfo AlternativeSpell { get; private set; }
 
         private string[] rawEntryValues;
     }

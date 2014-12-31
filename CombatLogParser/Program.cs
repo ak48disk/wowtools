@@ -14,7 +14,7 @@ namespace CombatLogParser
         {
             IEnumerable<RawCombatLogEntry> spellHeals;
             List<Combat> combats;
-            using (FileStream fs = new FileStream(@"G:\wowpvp1\Logs\WoWCombatLog.txt", FileMode.Open))
+            using (FileStream fs = new FileStream(@"E:\World of Warcraft\Logs\WoWCombatLog2.txt", FileMode.Open))
             {
                 var rw = new RawFileInlineReader().Then(new CombatSplitter());
                 combats = rw.Process(fs).Where(_=>_.Duration > new TimeSpan(0,1,0) && _.MainTarget != "Nothing")
@@ -35,7 +35,7 @@ namespace CombatLogParser
                 }
 
                 int index = int.Parse(str);
-                spellHeals = combats[index].Events.Where(_ => _.eventType.EndsWith ("_HEAL"));
+                spellHeals = combats[index].Events.Where(_ => _.EventType.EndsWith ("_HEAL"));
                 List<string> sourceNames = spellHeals.Select(_ => _.Source.Name).Distinct().ToList();
                 for (int i = 0; i < sourceNames.Count; ++i)
                 {
@@ -60,14 +60,14 @@ namespace CombatLogParser
                         if (s.StartsWith("v"))
                         {
                             var events = combat.Events.Where(r =>
-                                r.Dest.Name == "起点代言人" && r.eventType.StartsWith("SPELL") && r.Source.Reaction == Unit.UnitReaction.Hostile);
+                                r.Dest.Name == "起点代言人" && r.EventType.StartsWith("SPELL") && r.Source.Reaction == Unit.UnitReaction.Hostile);
                             foreach (var entry in events)
                             {
                                 Console.Write(entry.Time.ToString());
                                 Console.Write(" ");
                                 Console.Write(entry.Time.Millisecond.ToString());
                                 Console.Write(" ");
-                                Console.Write(entry.eventType);
+                                Console.Write(entry.EventType);
                                 if (entry.Damage != null)
                                 {
                                     Console.Write(" ");
@@ -79,11 +79,11 @@ namespace CombatLogParser
                                 {
                                     Console.Write(" ");
                                     Console.Write(entry.Spell.SpellName);
-                                    if (entry.eventType == "SPELL_AURA_REMOVED")
+                                    if (entry.EventType == "SPELL_AURA_REMOVED")
                                         Console.Write("Fade");
                                     Console.Write(" ");
-                                    if (entry.Other != null)
-                                    Console.Write(entry.Other.Amount);
+                                    if (entry.Amount.HasValue)
+                                    Console.Write(entry.Amount.Value);
                                 }
                                 Console.WriteLine();
                             }
@@ -91,7 +91,7 @@ namespace CombatLogParser
                         if (s.StartsWith("buff"))
                         {
 
-                            IEnumerable<RawCombatLogEntry> buff = combat.Events.Where(r => r.eventType == "SPELL_AURA_APPLIED" &&
+                            IEnumerable<RawCombatLogEntry> buff = combat.Events.Where(r => r.EventType == "SPELL_AURA_APPLIED" &&
                                 r.Source.Reaction == Unit.UnitReaction.Hostile &&
                                 r.Dest.Reaction == Unit.UnitReaction.Friendly).OrderBy(r => r.Time);
 
@@ -113,7 +113,7 @@ namespace CombatLogParser
                         if (s.StartsWith("cast"))
                         {
 
-                            IEnumerable<RawCombatLogEntry> buff = combat.Events.Where(r => r.eventType == "SPELL_CAST_SUCCESS" &&
+                            IEnumerable<RawCombatLogEntry> buff = combat.Events.Where(r => r.EventType == "SPELL_CAST_SUCCESS" &&
                                 r.Source.Reaction == Unit.UnitReaction.Hostile).OrderBy(r => r.Time);
 
                             var m = str.Split(' ');
